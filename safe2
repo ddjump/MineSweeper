@@ -1,0 +1,1059 @@
+##############################################################
+# Homework #4
+# name: Shen-Chieh Yen
+# sbuid: 110636500
+##############################################################
+.text
+
+##############################
+# PART 1 FUNCTIONS
+##############################
+
+preorder:
+    	#Define your code here
+    	addi $sp, $sp, -20		# Saving all the $s registers on the stack
+    	sw $s0, 0($sp)
+    	sw $s1, 4($sp)
+    	sw $s2, 8($sp)
+    	sw $s3, 12($sp)
+    	sw $ra, 16($sp)
+    	
+    	move $s0, $a0			# Current Node Address
+    	move $s1, $a1			# Array of nodes
+    	move $s2, $a2			# fd
+    	li $s3, 0			# Temp Variable
+    	
+    	lw $s3, ($s0)   	
+    	andi $s3, $s3, 0x0000FFFF	# Getting the nodeValue(16 bit)
+    	move $a0, $s3			# argu -- nodeValue
+    	move $a1, $s2			# argu -- fd
+    	
+    	addi $sp, $sp, -4		# Saving all the registers onto the stack
+    	sw $ra, 0($sp)
+    	
+    	jal itof
+    	
+    	lw $ra, 0($sp)
+    	addi $sp, $sp, 4
+    	
+    	move $a0, $s2			# File Descriptor
+    	li $a1, '\n'			# Character to be wrote
+    	li $a2, 1			# Size
+    	
+    	addi $sp, $sp, -4
+    	sw $ra, 0($sp)
+    	
+    	jal write
+    	
+    	lw $ra, 0($sp)
+    	addi $sp, $sp, 4
+    	
+    	lw $s3, ($s0)			# get the index of left node		
+    	andi $s3, $s3, 0xFF000000	
+    	srl $s3, $s3, 24		# shift 24 bits left
+    	
+    	beq $s3, 255, nextIf		# if(nodeIndex != 255)
+    	sll $s3, $s3, 2		
+    	add $s3, $s3, $s1		# leftNodeAddr = nodes + leftoffset
+    	
+    	move $a0, $s3
+    	move $a1, $s1
+    	move $a2, $s2
+    	
+    	addi $sp, $sp, -4		# preorder(leftNodeAddr, nodes, fd);
+    	sw $ra, 0($sp)
+    	
+    	jal preorder
+    	
+    	lw $ra, 0($sp)
+    	addi $sp, $sp, 4
+nextIf:
+    	lw $s3, ($s0)			# get the index of right node		
+    	andi $s3, $s3, 0x00FF0000	
+    	srl $s3, $s3, 16		# shift 24 bits left
+    	
+    	beq $s3, 255, nextIf2		# if(nodeIndex != 255)
+    	sll $s3, $s3, 2		
+    	add $s3, $s3, $s1		# rightNodeAddr = nodes + rightoffset
+    	
+    	move $a0, $s3
+    	move $a1, $s1
+    	move $a2, $s2
+    	
+    	addi $sp, $sp, -4		# preorder(RightNodeAddr, nodes, fd);
+    	sw $ra, 0($sp)
+    	
+    	jal preorder
+    	
+    	lw $ra, 0($sp)
+    	addi $sp, $sp, 4
+    	
+nextIf2:
+    	
+    	lw $s0, 0($sp)
+    	lw $s1, 4($sp)
+    	lw $s2, 8($sp)
+    	lw $s3, 12($sp)
+    	lw $ra, 16($sp)
+    	addi $sp, $sp, 20
+    	
+	jr $ra
+
+###############
+itof:
+###############
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	
+	move $t0, $a0			# Have the Node Value (16-bit Integer)
+	move $t1, $a1			# fd --> Integer
+	li $t2, 10			# Temp variable, holds 10 at the moment for dividing
+	li $t3, 0			# Temp variable
+	li $t4, 0			# Counter number of digits	
+
+	andi $t3, $t0, 0x8000
+	beqz $t3, notNegative
+	addi $t0, $t0, 0xFFFF0000
+	abs $t0, $t0
+	la $t2, buffer
+	li $t3, 45
+	sb $t3, 0($t2)			# Stores the byte onto buffer
+	
+	move $a0, $t1			# Contain the File Descriptor
+	la $a1, buffer			# Have the Address of the buffer
+	li $a2, 1			# Number of characters it reads
+	li $v0, 15			# Syscall 15 -- write to file
+	syscall
+notNegative:
+
+loopNumber:
+	beqz $t0, doneLoopNumber
+	li $t2, 10
+	div $t0, $t2			# Divde the value by 10
+	mfhi $t3			# HI reminder		
+	addi $sp, $sp, -4
+	sw $t3, 0($sp)
+	addi $t4, $t4, 1		# Adds one counter
+	mflo $t0
+	j loopNumber
+doneLoopNumber:
+	
+writingOnFile:
+	beqz $t4, doneWriting		# Breaks the loop when counter equals zero
+	lw $t3, 0($sp)
+	addi $sp, $sp, 4			
+	
+	addi $t3, $t3, 48
+	la $t2, buffer
+	sb $t3, 0($t2)			# Stores the byte onto buffer
+	
+	move $a0, $t1			# Contain the File Descriptor
+	la $a1, buffer			# Have the Address of the buffer
+	li $a2, 1			# Number of characters it reads
+	li $v0, 15			# Syscall 15 -- write to file
+	syscall
+	
+	addi $t4, $t4, -1
+	j writingOnFile
+
+doneWriting:
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	
+	jr $ra
+###############
+write:	
+###############
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	
+	move $t0, $a0			# fd
+	move $t1, $a1			# The character to be wrote
+	move $t2, $a2			# size
+	li $t3, 0			# temp variable
+
+	la $t3, bufferWrite
+	sb $t1, 0($t3)
+	
+	move $a0, $t0
+	la $a1, bufferWrite
+	move $a2, $t2
+	li $v0, 15
+	syscall
+
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	
+	jr $ra
+
+##############################
+# PART 2 FUNCTIONS
+##############################
+
+linear_search:
+    	#Define your code here
+	addi $sp, $sp, -28		# Saving all the $s registers on the stack
+    	sw $s0, 0($sp)
+    	sw $s1, 4($sp)
+    	sw $s2, 8($sp)
+    	sw $s3, 12($sp)
+    	sw $s4, 16($sp)
+    	sw $s5, 20($sp)
+    	sw $ra, 24($sp)
+    	
+    	move $s0, $a0			# Have address of the byte array
+    	move $s1, $a1			# Contains maxSize
+    	li $s2, 0			# Temp Variable
+    	li $s3, 0			# Temp Variable
+    	li $s4, 0			# Have the index of the next free space
+    	li $s5, 8			# Counter of 8
+
+traverseFlagArray:
+	lb $s2, 0($s0)
+searchBit:
+	andi $s3, $s2, 1
+	beqz $s3, foundZero
+	addi $s1, $s1, -1
+	beqz $s1, noZero
+	srl $s2, $s2, 1
+	addi $s4, $s4, 1
+	addi $s5, $s5, -1
+	beqz $s5, endSearchBit
+	j searchBit
+endSearchBit:
+	li $s5, 8
+	addi $s0, $s0, 1
+	j traverseFlagArray
+foundZero:
+	move $v0, $s4
+	j doneLinearSearch
+noZero:
+	li $v0, -1
+	
+doneLinearSearch:
+
+	lw $s0, 0($sp)
+    	lw $s1, 4($sp)
+    	lw $s2, 8($sp)
+    	lw $s3, 12($sp)
+    	lw $s4, 16($sp)
+    	lw $s5, 20($sp)
+    	lw $ra, 24($sp)
+    	addi $sp, $sp, 28
+	
+    	jr $ra
+
+set_flag:
+    	#Define your code here
+    	addi $sp, $sp, -32		# Saving all the $s registers on the stack
+    	sw $s0, 0($sp)
+    	sw $s1, 4($sp)
+    	sw $s2, 8($sp)
+    	sw $s3, 12($sp)
+    	sw $s4, 16($sp)
+    	sw $s5, 20($sp)
+    	sw $s6, 24($sp)
+    	sw $ra, 28($sp)
+    	
+    	move $s0, $a0			# byte [] flags
+    	move $s1, $a1			# index
+    	move $s2, $a2			# setValue
+    	move $s3, $a3			# maxSize
+    	li $s4, 0			# Temp Value
+    	li $s5, 0
+    	li $s6, 0
+    
+    	addi $s4, $s3, -1
+    	bltz $s1, errorSetFlag
+    	bgt $s1, $s4, errorSetFlag
+    	
+    	li $s4, 8 
+    	div $s1, $s4
+    	mflo $s4			# Quotient of divide
+    
+    	add $s0, $s0, $s4		# now contains the byte of where to store the value
+    	lb $s5, 0($s0)			# the byte where the index is located
+    	sll $s4, $s4, 3			# Multiply the quotient by 8
+    	sub $s4, $s1, $s4		# Index - Quotient*8
+    	
+    	li $s6, 1
+powerLoop:				# This loop finds the distance from the index and the beginning of the byte
+	beqz $s4, endPowerLoop		# gets the power of the number
+	sll $s6, $s6, 1			
+    	addi $s4, $s4, -1
+	j powerLoop
+endPowerLoop:
+	
+	beqz $s2, itsZeroSub		# Checks if if the new value is a zero or one
+	and $s4, $s5, $s6		# Checks if the index bit is a one
+	bnez $s4, storeBack 		# if its a one we just skip adding
+	add $s5, $s5, $s6
+	j storeBack
+itsZeroSub:				# if the set value is zero
+	and $s4, $s5, $s6
+	beqz $s4, storeBack		# if its equal zero then we skip subtracting, nothing is changed
+	sub $s5, $s5, $s6
+storeBack:
+	sb $s5, 0($s0)
+	li $v0, 1
+
+	j doneSetFlag
+	
+errorSetFlag:
+    	li $v0, 0
+    	
+doneSetFlag:
+	
+	lw $s0, 0($sp)
+    	lw $s1, 4($sp)
+    	lw $s2, 8($sp)
+    	lw $s3, 12($sp)
+    	lw $s4, 16($sp)
+    	lw $s5, 20($sp)
+    	lw $s6, 24($sp)
+    	lw $ra, 28($sp)
+    	addi $sp, $sp, 32
+
+    	jr $ra
+
+find_position:
+    	#Define your code here
+    	addi $sp, $sp, -28
+    	sw $s0, 0($sp)
+    	sw $s1, 4($sp)
+    	sw $s2, 8($sp)
+    	sw $s3, 12($sp)
+    	sw $s4, 16($sp)
+    	sw $s5, 20($sp)
+    	sw $ra, 24($sp)
+    	
+    	move $s0, $a0			# Nodes [] nodes
+    	move $s1, $a1			# int currIndex
+    	move $s2, $a2			# int newValue
+    	li $s3, 0			# Temp Value
+    	li $s4, 0
+    	li $s5, 0
+    	
+    	move $a0, $s2
+    	addi $sp, $sp, -4
+    	sw $ra, 0($sp)
+    	
+    	jal ExtendNumber
+    	
+    	lw $ra, 0($sp)
+    	addi $sp, $sp, 4
+    	move $s2, $v0			# Contains the newValue
+   
+	li $s3, 4		
+	mul $s5, $s1, $s3
+	add $s3, $s5, $s0		# find the memory address of nodes[currIndex]
+	lw $s4, 0($s3)
+	
+	move $a0, $s4			# $s4 has the value of the node
+    	addi $sp, $sp, -4
+    	sw $ra, 0($sp)
+    	
+    	jal ExtendNumber		# Get the 16-bit value from the node		
+    	
+    	lw $ra, 0($sp)
+    	addi $sp, $sp, 4
+    	move $s5, $v0
+    	
+    	blt $s2, $s5, trueIf		# if(newValue < nodes[currIndex].value) {
+    	j falseElse
+trueIf:
+    	andi $s4, $s4, 0xFF000000
+    	srl $s4, $s4, 24
+    	beq $s4, 255, its255Left
+    	j its255ElseLeft
+its255Left:
+	move $v0, $s1
+	li $v1, 0
+	j doneFindPosition
+its255ElseLeft:
+    	move $a0, $s0
+    	move $a1, $s4
+    	move $a2, $s2
+    	
+    	addi $sp, $sp, -4
+    	sw $ra, 0($sp)
+    	
+    	jal find_position
+    	
+    	lw $ra, 0($sp)
+    	addi $sp, $sp, 4
+    	
+    	j doneFindPosition
+falseElse:
+	andi $s4, $s4, 0x00FF0000
+	srl $s4, $s4, 16
+	beq $s4, 255, its255Right
+	j its255ElseRight
+its255Right:
+	move $v0, $s1
+	li $v1, 1
+	j doneFindPosition
+its255ElseRight:
+	move $a0, $s0
+    	move $a1, $s4								
+    	move $a2, $s2
+    	
+    	addi $sp, $sp, -4
+    	sw $ra, 0($sp)
+    	
+    	jal find_position
+    	
+    	lw $ra, 0($sp)
+    	addi $sp, $sp, 4
+
+doneFindPosition:
+
+	lw $s0, 0($sp)
+    	lw $s1, 4($sp)
+    	lw $s2, 8($sp)
+    	lw $s3, 12($sp)
+    	lw $s4, 16($sp)
+    	lw $s5, 20($sp)
+    	lw $ra, 24($sp)
+    	addi $sp, $sp, 28
+   	
+   	jr $ra
+
+################
+ExtendNumber:
+################
+	move $t0, $a0
+	li $t1, 0
+	
+	andi $t0, $t0, 0x0000FFFF
+    	andi $t1, $t0, 0x8000 
+    	beqz $t1, noExtend
+    	addi $t0, $t0, 0xFFFF0000
+noExtend:
+	move $v0, $t0
+	
+	jr $ra
+
+add_node:
+    	#Define your code here
+    	move $t0, $a0
+    	move $t1, $a1
+    	move $t2, $a2
+    	move $t3, $a3
+    	lw $t4, 4($sp)
+    	lw $t5, 0($sp)
+    	
+    	addi $sp, $sp, -36
+    	sw $s0, 0($sp)
+    	sw $s1, 4($sp)
+    	sw $s2, 8($sp)
+    	sw $s3, 12($sp)
+    	sw $s4, 16($sp)
+    	sw $s5, 20($sp)
+    	sw $s6, 24($sp)
+    	sw $s7, 28($sp)
+    	sw $ra, 32($sp)
+    	
+    	move $s0, $t0			# Node[] nodes
+    	move $s1, $t1			# int rootIndex
+    	move $s2, $t2			# int newValue
+    	move $s3, $t3			# int newIndex
+    	move $s4, $t4			# byte[] flags
+    	move $s5, $t5			# int maxSize
+    	li $s6, 0			# temp value
+    	li $s7, 0
+    			
+    	andi $s1, $s1, 0xFF		# rootIndex = toUnsignedByte(rootIndex)
+	
+    	andi $s3, $s3, 0xFF		# newIndex = toUnsignedByte(newIndex)
+	
+	bge $s1, $s5, failure		# if(rootIndex >= maxSize || newIndex >= maxSize) { return 0;}
+	bge $s3, $s5, failure
+	
+	move $a0, $s2			# newValue = toSignedHalfWord(newValue);
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	
+	jal ExtendNumber
+	
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	move $s2, $v0			# gets the newValue(16-bit) half word
+	
+	move $a0, $s1
+	move $a1, $s4
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	
+	jal nodeExists
+	
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	
+	beq $v0, 1, ifValidRoot
+	j elseInvalidRoot
+ifValidRoot:				# if(validRoot) {
+	move $a0, $s0			# find_position(nodes, rootIndex, newValue);
+	move $a1, $s1
+	move $a2, $s2
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	
+	jal find_position
+	
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	li $s6, 4
+	mul $s6, $s6, $v0
+	add $s6, $s6, $s0
+	lw $s7, 0($s6)
+	beqz $v1, itsLeft
+	j elseRight
+itsLeft:
+	andi $s7, $s7, 0x00FFFFFF
+	sll $s3, $s3, 24
+	add $s7, $s7, $s3		# nodes[parentIndex].left = newIndex
+	sw $s7, 0($s6)
+	srl $s3, $s3, 24
+	j breakIfStatement
+elseRight:
+	andi $s7, $s7, 0xFF00FFFF
+	sll $s3, $s3, 16
+	add $s7, $s7, $s3		# nodes[parentIndex].right = newIndex
+	sw $s7, 0($s6)
+	srl $s3, $s3, 16
+	j breakIfStatement
+elseInvalidRoot:			# else {
+	move $s3, $s1			# newIndex = rootIndex;
+breakIfStatement:
+	li $s6, 4			# nodes[newIndex].LeftNode = 255;
+	mul $s6, $s6, $s3		# nodes[newIndex].RightNode = 255;
+	add $s6, $s6, $s0		# nodes[newIndex] = newValue;
+	addi $s7, $s2, 0xFFFF0000
+	sw $s7, 0($s6)
+	
+	move $a0, $s4
+	move $a1, $s3
+	li $a2, 1
+	move $a3, $s5
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	
+	jal set_flag
+	
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	
+	j doneAddNode
+failure:
+	li $v0, 0	
+
+doneAddNode:
+    	lw $s0, 0($sp)
+    	lw $s1, 4($sp)
+    	lw $s2, 8($sp)
+    	lw $s3, 12($sp)
+    	lw $s4, 16($sp)
+    	lw $s5, 20($sp)
+    	lw $s6, 24($sp)
+    	lw $s7, 28($sp)
+    	lw $ra, 32($sp)
+    	addi $sp, $sp, 36
+	jr $ra
+	
+#############
+nodeExists:
+#############
+	move $t0, $a0			# rootIndex
+	move $t1, $a1			# byte[] flags
+	li $t2, 8			# temp value
+	li $t3, 0
+	
+	div $t0, $t2			# Lo -- quo Hi -- reminder
+	mflo $t2			# contains how many bytes away is the index
+	add $t1, $t1, $t2		# memory address of the current byte the index is in
+	mfhi $t2			# distance from beginning of the byte and the index
+	lb $t3, 0($t1)
+	srlv $t3, $t3, $t2
+	andi $t3, $t3, 0x1
+	move $v0, $t3
+
+	jr $ra
+
+##############################
+# PART 3 FUNCTIONS
+##############################
+
+get_parent:
+    	#Define your code here
+    	addi $sp, $sp, -28		# Saving all the $s registers on the stack
+    	sw $s0, 0($sp)
+    	sw $s1, 4($sp)
+    	sw $s2, 8($sp)
+    	sw $s3, 12($sp)
+    	sw $s4, 16($sp)
+    	sw $s5, 20($sp)
+    	sw $ra, 24($sp)
+    	
+   	move $s0, $a0			# Node[] nodes
+   	move $s1, $a1			# int currIndex
+   	move $s2, $a2			# int childValue
+   	move $s3, $a3			# int childIndex
+   	li $s4, 4
+   	li $s5, 0
+   			
+   	andi $s3, $s3, 0xFF		# childIndex = toUnsignedByte(childIndex);
+   	
+   	move $a0, $s2			# childValue = toSignedHalfWord(childValue);
+   	addi $sp, $sp, -4
+   	sw $ra, 0($sp)
+   	
+   	jal ExtendNumber
+   			
+   	lw $ra, 0($sp)
+   	addi $sp, $sp, 4
+   	move $s2, $v0
+   	
+   	mul $s4, $s4, $s1
+   	add $s4, $s4, $s0
+   	lw $s5, 0($s4)			# nodes[currIndex]
+   	
+   	addi $sp, $sp, -4
+   	sw $ra, 0($sp)
+   	
+   	move $a0, $s5
+   	jal ExtendNumber		# nodes[currIndex].value
+   	
+   	lw $ra, 0($sp)
+   	addi $sp, $sp, 4
+   	move $s4, $v0
+   	
+   	blt $s2, $s4,goToLeft
+   	j goToRight
+goToLeft:
+	andi $s5, $s5, 0xFF000000
+	srl $s5, $s5, 24
+	beq $s5, 255, leftEquals255	# if (leftIndex == 255) {
+	beq $s5, $s3, leftEqualsChild	# else if (leftIndex == childIndex) {
+	
+	move $a0, $s0			# nodes
+	move $a1, $s5			# leftIndex
+	move $a2, $s2			# childValue
+	move $a3, $s3			# childIndex
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	
+	jal get_parent			# get_parent(nodes, leftIndex, childValue, childIndex);
+	
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4 
+	j doneGetParent
+leftEquals255:
+	li $v0, -1
+	j doneGetParent
+leftEqualsChild:
+	move $v0, $s1
+	li $v1, 0
+	j doneGetParent
+goToRight:
+	andi $s5, $s5, 0x00FF0000
+	srl $s5, $s5, 16
+	beq $s5, 255, rightEquals255	# if (rightIndex == 255) {
+	beq $s5, $s3, rightEqualsChild	# else if (rightIndex == childIndex) {
+	
+	move $a0, $s0			# nodes
+	move $a1, $s5			# rightIndex
+	move $a2, $s2			# childValue
+	move $a3, $s3			# childIndex
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	
+	jal get_parent			# get_parent(nodes, rightIndex, childValue, childIndex);
+	
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4 
+	j doneGetParent
+rightEquals255:
+	li $v0, -1
+	j doneGetParent
+rightEqualsChild:
+	move $v0, $s1
+	li $v1, 1
+doneGetParent:
+	lw $s0, 0($sp)
+    	lw $s1, 4($sp)
+    	lw $s2, 8($sp)
+    	lw $s3, 12($sp)
+    	lw $s4, 16($sp)
+    	lw $s5, 20($sp)
+    	lw $ra, 24($sp)
+    	addi $sp, $sp, 28
+   	   	
+    	jr $ra
+find_min:
+    	#Define your code here
+    	addi $sp, $sp, -20		# Saving all the $s registers on the stack
+    	sw $s0, 0($sp)
+    	sw $s1, 4($sp)
+    	sw $s2, 8($sp)
+    	sw $s3, 12($sp)
+    	sw $ra, 16($sp)
+    	
+    	move $s0, $a0			# Node[] nodes
+    	move $s1, $a1			# int currIndex
+    	li $s2, 4
+    	li $s3, 0
+    	
+    	mul $s2, $s2, $s1
+    	add $s2, $s2, $s0		
+    	lw $s3, 0($s2)			# nodes[currIndex]
+    	andi $s2, $s3, 0xFF000000	# getting the left index
+    	srl $s2, $s2, 24		# leftIndex
+    	beq $s2, 255, if255
+    	
+    	move $a0, $s0
+    	move $a1, $s2
+    	addi $sp, $sp, -4
+    	sw $ra, 0($sp)
+    	
+    	jal find_min
+    	
+    	lw $ra, 0($sp)
+    	addi $sp, $sp, 4
+    	j doneFindMin
+if255:
+	andi $s3, $s3, 0x00FF0000
+	srl $s3, $s3, 16
+	beq $s3, 255, itsALeaf
+	li $v1, 0
+	j finishIsLeaf
+itsALeaf:
+	li $v1, 1
+finishIsLeaf:
+	move $v0, $s1
+doneFindMin:
+	lw $s0, 0($sp)
+    	lw $s1, 4($sp)
+    	lw $s2, 8($sp)
+    	lw $s3, 12($sp)
+    	lw $ra, 16($sp)
+    	addi $sp, $sp, 20
+	jr $ra
+
+delete_node:
+    	#Define your code here
+    	move $s0, $a0			# Node[] nodes
+    	move $s1, $a1			# int rootIndex
+    	move $s2, $a2			# int deleteIndex
+    	move $s3, $a3			# byte[] flags
+    	lw $s4, 0($sp)			# int maxSize
+    	li $s5, 0			# Temp Value
+    	li $s6, 0
+    	li $s7, 0
+    	
+    	andi $s1, $s1, 0xFF		# rootIndex = toUnsignedByte(rootIndex)
+    			
+    	andi $s2, $s2, 0xFF		# deleteIndex = toUnsignedByte(deleteNode)
+    	
+    	bge $s1, $s4, errorDeleteNode
+    	bge $s2, $s4, errorDeleteNode
+    	
+    	move $a0, $s1			# !validRoot
+    	move $a1, $s3
+    	addi $sp, $sp, -4
+    	sw $ra, 0($sp)
+    	
+    	jal nodeExists
+    	
+    	lw $ra, 0($sp)
+    	addi $sp, $sp, 4
+    	beqz $v0, errorDeleteNode
+    					# OR
+    	move $a0, $s2			# !validDel
+    	move $a1, $s3
+    	addi $sp, $sp, -4
+    	sw $ra, 0($sp)
+    	
+    	jal nodeExists
+    	
+    	lw $ra, 0($sp)
+    	addi $sp, $sp, 4
+    	beqz $v0, errorDeleteNode
+    
+	li $s5, 4
+	mul $s5, $s5, $s2
+	add $s5, $s5, $s0
+	lw $s6, 0($s5)				# nodes[deleteIndex]
+	andi $s7, $s6, 0xFFFF0000
+	srl $s7, $s7, 16
+	li $s6, 0xFFFF
+	beq $s7, $s6, deleteLeaf
+	j checkNextIf
+deleteLeaf:
+	move $a0, $s3
+	move $a1, $s2
+	li $a2, 0
+	move $a3, $s4
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	
+	jal set_flag			# set_flag(flags, deleteIndex, 0, maxSize)
+	
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	
+	bne $s2, $s1, deleteNotEqualIndex	# if(deleteIndex == rootIndex) {
+	li $v0, 1
+	j doneDeleteNode
+deleteNotEqualIndex:
+	lh $s7, 0($s5)
+	move $a0, $s0
+	move $a1, $s1
+	move $a2, $s7
+	move $a3, $s2
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	
+	jal get_parent			# get_parent(nodes, rootIndex, nodes[deleteIndex].value, deleteIndex):
+	
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	beqz $v1, getLeft		# if(leftOrRight == left)
+	j getRight
+getLeft:
+	sll $s5, $v0, 2
+	add $s5, $s5, $s0
+	lw $s6, 0($s5)			# nodes[parentIndex]
+	andi $s6, $s6, 0x00FFFFFF
+	addi $s6, $s6, 0xFF000000
+	sw $s6, 0($s5)			# nodes[parentIndex].left = 255;
+	li $v0, 1
+	j doneDeleteNode
+getRight:
+	sll $s5, $v0, 2
+	add $s5, $s5, $s0
+	lw $s6, 0($s5)			# nodes[parentIndex]
+	andi $s6, $s6, 0xFF00FFFF
+	addi $s6, $s6, 0x00FF0000
+	sw $s6, 0($s5)			# nodes[parentIndex].right = 255;
+	li $v0, 1
+	j doneDeleteNode
+checkNextIf:
+    	andi $s5, $s7, 0x00FF
+    	beq $s5, 0x00FF, hasLeftChild
+    	andi $s5, $s7, 0xFF00
+    	li $s6, 0xFF00
+    	beq $s5, $s6, hasRightChild
+    	j checkNextElse
+hasLeftChild:
+	andi $s5, $s7, 0XFF00
+    	srl $s5, $s5, 8			# childIndex = nodes[deleteIndex].left; -- $s5
+    	j hasOver
+hasRightChild:
+	andi $s5, $s7, 0X00FF		# childIndex = nodes[deleteIndex].right; -- $s5
+hasOver:
+	beq $s1, $s2, deleteEqualRoot
+	j movingOn
+deleteEqualRoot:
+	sll $s7, $s5, 2
+	add $s7, $s7, $s0		
+	lw $s6, 0($s7)			# childNode = nodes[childIndex]; -- $s6
+	sll $s7, $s2, 2
+	add $s7, $s7, $s0
+	sw $s6, 0($s7)			# nodes[deleteIndex] = childNode;
+	
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	
+	move $a0, $s3
+	move $a1, $s5
+	li $a2, 0
+	move $a3, $s4
+	jal set_flag			# set_flag(flags, childIndex, 0, maxSize);
+	
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	
+	li $v0, 1
+	j doneDeleteNode
+movingOn:
+	sll $s6, $s2, 2
+	add $s6, $s6, $s0
+	lh $s7, 0($s6)			# nodes[deleteIndex].value
+	move $a0, $s0
+	move $a1, $s1
+	move $a2, $s7
+	move $a3, $s2
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	
+	jal get_parent			# int parentIndex, leftOrRight = get_parent(nodes, rootIndex, nodes[deleteIndex].value, deleteIndex);
+	
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	
+	sll $s7, $v0, 2
+	add $s7, $s7, $s0
+	lw $s6, 0($s7)			# nodes[parentIndex]
+	
+	beqz $v1, getToLeft
+	j getToRight
+getToLeft:
+	andi $s6, $s6, 0x00FFFFFF
+	sll $s5, $s5, 24
+	add $s6, $s6, $s5
+	sw $s6, 0($s7)			# nodes[parentIndex].left = childIndex
+	j oneMoreThing
+getToRight:
+	andi $s6, $s6, 0xFF00FFFF
+	sll $s5, $s5, 16
+	add $s6, $s6, $s5
+	sw $s6, 0($s7)			# nodes[parentIndex].right = childIndex
+oneMoreThing:
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	
+	move $a0, $s3
+	move $a1, $s2
+	li $a2, 0
+	move $a3, $s4
+	jal set_flag			# set_flag(flags, deleteIndex, 0, maxSize);
+	
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	li $v0, 1
+	j doneDeleteNode
+checkNextElse:
+    	sll $s5, $s2 2
+    	add $s5, $s5, $s0
+    	lw $s6, 0($s5)			# nodes[deleteIndex]
+    	andi $s6, $s6, 0x00FF0000
+    	srl $s6, $s6, 16		# nodes[deleteIndex].right
+    	
+    	addi $sp, $sp, -4
+    	sw $ra, 0($sp)
+    	
+    	move $a0, $s0
+    	move $a1, $s6
+    	jal find_min			# int minIndex, minIsLeaf = find_min(nodes, nodes[deleteIndex].right);
+    	
+    	lw $ra, 0($sp)
+    	addi $sp, $sp, 4
+    	
+    	sll $s5, $v0, 2
+    	add $s5, $s5, $s0
+    	lh $s6, 0($s5)			# nodes[minIndex].value
+    	move $s5, $v0			# $s5 contains minIndex
+    	move $s7, $v1			# $s7 contains minIsLeaf
+    	
+    	move $a0, $s0
+    	move $a1, $s2
+    	move $a2, $s6
+    	move $a3, $s5
+    	addi $sp, $sp, -4
+    	sw $ra, 0($sp)
+    	
+    	jal get_parent
+    	
+    	lw $ra, 0($sp)
+    	addi $sp, $sp, 4
+    	
+    	beq $s7, 1, lastIf
+    	j lastElse
+lastIf:
+	beqz $v1, ifLeft
+	j ifRight
+ifLeft:
+	sll $v0, $v0, 2
+	add $v0, $v0, $s0
+	lw $s7, 0($v0)
+	andi $s7, $s7, 0x00FFFFFF
+	addi $s7, $s7, 0xFF000000
+	sw $s7, 0($v0)			# nodes[parentIndex].left = 255;
+	j lastThing
+ifRight:
+	sll $v0, $v0, 2
+	add $v0, $v0, $s0
+	lw $s7, 0($v0)
+	andi $s7, $s7, 0xFF00FFFF
+	addi $s7, $s7, 0x00FF0000
+	sw $s7, 0($v0)			# nodes[parentIndex].right = 255;
+	j lastThing
+lastElse:
+	beqz $v1, elseLastLeft
+	j elseLastRight
+elseLastLeft:
+	sll $v0, $v0, 2
+	add $v0, $v0, $s0
+	lw $s7, 0($v0)			# nodes[parentIndex]	
+	andi $s7, $s7, 0x00FFFFFF
+	sll $s5, $s5, 2
+	add $s5, $s5, $s0
+	lw $s6, 0($s5)
+	andi $s6, $s6, 0x00FF0000	# nodes[minIndex].right
+	sll $s6, $s6, 8
+	add $s7, $s7, $s6		
+	sw $s7, 0($v0)			# nodes[parentIndex].left = nodes[minIndex].right;
+	j lastThing
+elseLastRight:
+    	sll $v0, $v0, 2
+	add $v0, $v0, $s0
+	lw $s7, 0($v0)			# nodes[parentIndex]	
+	andi $s7, $s7, 0xFF00FFFF
+	sll $s5, $s5, 2
+	add $s5, $s5, $s0
+	lw $s6, 0($s5)
+	andi $s6, $s6, 0x00FF0000	# nodes[minIndex].right
+	sll $s6, $s6, 8
+	add $s7, $s7, $s6		
+	sw $s7, 0($v0)			# nodes[parentIndex].right = nodes[minIndex].right;
+	j lastThing
+lastThing:
+	sll $s2, $s2, 2
+	add $s2, $s2, $s0
+	lw $s6, 0($s2)			# nodes[deleteIndex]
+	andi $s6, $s6, 0xFFFF0000
+	move $a1, $s5			# put in $a1, early so the value wont be lost
+	sll $s5, $s5, 2
+	add $s5, $s5, $s0
+	lh $s7, 0($s5)			# nodes[minIndex]
+	add $s6, $s6, $s7
+	sw $s6, 0($s2)
+	
+	addi $sp, $sp, -4
+	sw $ra, 0($sp)
+	
+	move $a0, $s3
+	#move $a1, $s5
+	li $a2, 0
+	move $a3, $s4
+	jal set_flag
+	
+	lw $ra, 0($sp)
+	addi $sp, $sp, 4
+	li $v0, 1
+	j doneDeleteNode
+errorDeleteNode:
+	li $v0, 0
+doneDeleteNode:
+    	
+    	jr $ra
+
+##############################
+# EXTRA CREDIT FUNCTION
+##############################
+
+add_random_nodes:
+    #Define your code here
+    jr $ra
+
+
+
+#################################################################
+# Student defined data section
+#################################################################
+.data
+.align 2  # Align next  items to word boundary
+buffer: .space 1
+bufferWrite: .space 1
+#place any additional data declarations here
